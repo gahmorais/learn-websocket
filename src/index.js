@@ -1,27 +1,36 @@
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { dirname, join } from "path";
-import { writeFileSync, readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { fileURLToPath } from "url";
 const httpServer = createServer();
 const socket = new Server(httpServer);
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-socket.on("connection", (client) => {
-  console.log("conectado");
+socket.on("connect", (client) => {
+  console.log(`client ${client.id} conectado`);
   client.on("image", sendImages);
-  client.on("disconnect", (reason) => {
-    console.log("desconectando " + reason);
-  });
+  client.on("disconnect", onDisconnected);
 });
 
-function sendImages() {
-  for (let i = 1; i < 4; i++) {
-    console.log("enviando imagens");
-    const image = join(currentDir, `./assets/${i}.jpg`);
-    const imageStream = readFileSync(image);
-    socket.emit("images", imageStream);
-  }
+function onDisconnected(reason) {
+  console.log("desconectando " + reason);
 }
 
-httpServer.listen(3000);
+function createFileStream(dir) {
+  return readFileSync(dir);
+}
+
+function sendImages(_, send) {
+  const filesImages = readdirSync(join(currentDir, "./assets"));
+  const imagesStream = filesImages.map((image) => {
+    const images = join(currentDir, `./assets/${image}`);
+    return createFileStream(images);
+  });
+  console.log("enviando imagens");
+  send({ size: imagesStream.length, images: imagesStream });
+}
+
+httpServer.listen(3000, () => {
+  console.log("Server online!");
+});
